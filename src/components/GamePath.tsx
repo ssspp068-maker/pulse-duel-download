@@ -115,7 +115,7 @@ export function GamePath({ onBack, onPlay, selectedId, onSelect }: GamePathProps
             </div>
 
             <p className="mt-5 rounded-2xl bg-[color:color-mix(in_srgb,var(--gold)_12%,transparent)] px-4 py-3 text-sm text-[var(--paper)]">
-              Прототип уже собран: timing + вызов другу по ссылке. Жми «Играть прототип».
+              Игра «ПУЛЬС» живёт отдельно на главной (/). Жми «Играть прототип».
             </p>
             <button
               type="button"
