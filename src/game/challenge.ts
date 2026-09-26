@@ -50,21 +50,14 @@ export function decodeChallenge(raw: string | null): ChallengePayload | null {
 }
 
 export function buildPlayUrl(challenge?: ChallengePayload): string {
-  const url = new URL(window.location.href)
-  url.searchParams.set('play', '1')
+  const url = new URL(window.location.origin + '/')
   if (challenge) {
     url.searchParams.set('c', encodeChallenge(challenge))
-  } else {
-    url.searchParams.delete('c')
   }
-  url.hash = ''
   return url.toString()
 }
 
-export function readPlayMode(): { play: boolean; challenge: ChallengePayload | null } {
+export function readChallengeFromUrl(): ChallengePayload | null {
   const params = new URLSearchParams(window.location.search)
-  return {
-    play: params.get('play') === '1',
-    challenge: decodeChallenge(params.get('c')),
-  }
+  return decodeChallenge(params.get('c'))
 }
