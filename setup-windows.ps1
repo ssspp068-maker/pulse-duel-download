@@ -1,76 +1,66 @@
 #Requires -Version 5.1
-<#
-  Пульс-дуэль — установка и запуск на Windows (один файл).
-  Дважды кликни или: powershell -ExecutionPolicy Bypass -File .\setup-windows.ps1
-#>
 $ErrorActionPreference = 'Stop'
 Set-Location -Path $PSScriptRoot
+$Host.UI.RawUI.WindowTitle = 'PULSE setup'
 
-function Write-Step([string]$Message) {
-  Write-Host ""
-  Write-Host "==> $Message" -ForegroundColor Cyan
+Write-Host ''
+Write-Host '========================================'
+Write-Host '  PULSE - ustanovka na Windows'
+Write-Host '========================================'
+Write-Host "Papka: $PSScriptRoot"
+Write-Host ''
+
+if (-not (Test-Path (Join-Path $PSScriptRoot 'package.json'))) {
+  Write-Host '[OSHIBKA] Net package.json. Zapusti skript iz kornya ZIP.' -ForegroundColor Red
+  Read-Host 'Nazhmi Enter'
+  exit 1
 }
 
-function Ensure-Node {
-  $node = Get-Command node -ErrorAction SilentlyContinue
-  if ($node) {
-    $version = & node -v
-    Write-Host "Node найден: $version"
-    return
-  }
-
-  Write-Step "Node.js не найден — ставлю LTS через winget"
-  $winget = Get-Command winget -ErrorAction SilentlyContinue
-  if (-not $winget) {
-    Write-Host @"
-
-Node.js не установлен, и winget недоступен.
-1) Скачай Node.js 22 LTS: https://nodejs.org/
-2) Установи с галкой Add to PATH
-3) Закрой и снова открой этот скрипт
-
-"@ -ForegroundColor Yellow
-    throw "Нужен Node.js 22+"
-  }
-
-  & winget install -e --id OpenJS.NodeJS.LTS --accept-package-agreements --accept-source-agreements
-  if ($LASTEXITCODE -ne 0) {
-    throw "winget не смог поставить Node.js (код $LASTEXITCODE)"
-  }
-
-  # Обновляем PATH текущей сессии
+function Refresh-Path {
   $machinePath = [Environment]::GetEnvironmentVariable('Path', 'Machine')
   $userPath = [Environment]::GetEnvironmentVariable('Path', 'User')
   $env:Path = "$machinePath;$userPath"
+}
 
-  $node = Get-Command node -ErrorAction SilentlyContinue
-  if (-not $node) {
-    throw "Node установился, но не виден в PATH. Закрой окно и запусти setup-windows.ps1 ещё раз."
+$node = Get-Command node -ErrorAction SilentlyContinue
+if (-not $node) {
+  Write-Host '[!] Node.js ne nayden' -ForegroundColor Yellow
+  $winget = Get-Command winget -ErrorAction SilentlyContinue
+  if (-not $winget) {
+    Write-Host 'Otkroyu stranicu Node.js LTS. Ustanovi i zapusti skript snova.' -ForegroundColor Yellow
+    Start-Process 'https://nodejs.org/'
+    Read-Host 'Nazhmi Enter'
+    exit 1
   }
-  Write-Host "Node установлен: $(node -v)"
+  Write-Host 'Stavlyu Node.js cherez winget...'
+  & winget install -e --id OpenJS.NodeJS.LTS --accept-package-agreements --accept-source-agreements
+  if ($LASTEXITCODE -ne 0) {
+    Write-Host '[OSHIBKA] winget ne smog postavit Node' -ForegroundColor Red
+    Start-Process 'https://nodejs.org/'
+    Read-Host 'Nazhmi Enter'
+    exit 1
+  }
+  Write-Host 'Node ustanovlen. Zakroy okno i zapusti skript SNOVA.' -ForegroundColor Green
+  Read-Host 'Nazhmi Enter'
+  exit 0
 }
 
-Write-Host "Пульс-дуэль · автоустановка" -ForegroundColor Green
-Write-Host "Папка: $PSScriptRoot"
-
-if (-not (Test-Path -Path (Join-Path $PSScriptRoot 'package.json'))) {
-  throw "Запусти скрипт из корня проекта (рядом с package.json)."
-}
-
-Ensure-Node
-
-Write-Step "npm install"
+Refresh-Path
+Write-Host "[OK] Node: $(node -v)"
+Write-Host ''
+Write-Host '[1/2] npm install ...'
 & npm install
-if ($LASTEXITCODE -ne 0) { throw "npm install завершился с ошибкой" }
+if ($LASTEXITCODE -ne 0) {
+  Write-Host '[OSHIBKA] npm install' -ForegroundColor Red
+  Read-Host 'Nazhmi Enter'
+  exit 1
+}
 
-Write-Step "Проверка сборки"
-& npm run build
-if ($LASTEXITCODE -ne 0) { throw "npm run build завершился с ошибкой" }
-
-Write-Step "Запуск dev-сервера на http://127.0.0.1:4721"
-Write-Host "Игра:  http://127.0.0.1:4721/?play=1"
-Write-Host "Стоп:  Ctrl+C"
-Write-Host ""
-
-Start-Process "http://127.0.0.1:4721/?play=1"
+Write-Host ''
+Write-Host '[2/2] Zapusk http://127.0.0.1:4721/'
+Write-Host 'Ne zakryvay eto okno. Stop: Ctrl+C'
+Write-Host ''
+Start-Sleep -Seconds 1
+Start-Process 'http://127.0.0.1:4721/'
 & npm run dev
+Read-Host 'Nazhmi Enter'

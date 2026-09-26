@@ -1,47 +1,97 @@
 @echo off
-chcp 65001 >nul
+setlocal EnableExtensions
+title PULSE setup
 cd /d "%~dp0"
+
 echo.
-echo Пульс-дуэль — установка (Windows)
+echo ========================================
+echo   PULSE - ustanovka na Windows
+echo ========================================
+echo.
+echo Papka: %CD%
 echo.
 
-where node >nul 2>nul
-if errorlevel 1 (
-  echo Node.js не найден. Пробую поставить через winget...
-  where winget >nul 2>nul
-  if errorlevel 1 (
-    echo.
-    echo Поставь Node.js 22 LTS вручную: https://nodejs.org/
-    echo Потом снова запусти setup-windows.bat
-    echo.
-    pause
-    exit /b 1
-  )
-  winget install -e --id OpenJS.NodeJS.LTS --accept-package-agreements --accept-source-agreements
-  if errorlevel 1 (
-    echo Не удалось поставить Node через winget.
-    pause
-    exit /b 1
-  )
+if not exist "package.json" (
+  echo [OSHIBKA] Net package.json.
+  echo Zapusti bat iz kornya proekta posle raspakovki ZIP.
   echo.
-  echo Node установлен. Закрой это окно и СНОВА запусти setup-windows.bat
   pause
-  exit /b 0
+  exit /b 1
 )
 
-echo Node: 
+where node >nul 2>nul
+if errorlevel 1 goto INSTALL_NODE
+
+echo [OK] Node nayden:
 node -v
 echo.
+goto DO_INSTALL
 
-call npm install
+:INSTALL_NODE
+echo [!] Node.js ne nayden.
+echo.
+where winget >nul 2>nul
 if errorlevel 1 (
-  echo npm install не удался
+  echo [OSHIBKA] Net winget.
+  echo.
+  echo 1^) Skachay Node.js LTS: https://nodejs.org/
+  echo 2^) Ustanovi s galkoy "Add to PATH"
+  echo 3^) Zakroy VSE okna terminala
+  echo 4^) Snova zapusti etot bat
+  echo.
+  start "" "https://nodejs.org/"
+  pause
+  exit /b 1
+)
+
+echo Stavlyu Node.js cherez winget...
+echo ^(mozhet poprosit podtverzhdenie UAC^)
+echo.
+winget install -e --id OpenJS.NodeJS.LTS --accept-package-agreements --accept-source-agreements
+if errorlevel 1 (
+  echo.
+  echo [OSHIBKA] winget ne smog postavit Node.
+  echo Postav vruchnuyu: https://nodejs.org/
+  start "" "https://nodejs.org/"
   pause
   exit /b 1
 )
 
 echo.
-echo Запускаю http://127.0.0.1:4721/?play=1
-start "" "http://127.0.0.1:4721/?play=1"
-call npm run dev
+echo Node ustanovlen.
+echo ZAKROY eto okno i SNOVA zapusti setup-windows.bat
+echo ^(nuzhno chtoby PATH obnovilsya^)
+echo.
 pause
+exit /b 0
+
+:DO_INSTALL
+echo [1/2] npm install ...
+call npm install
+if errorlevel 1 (
+  echo.
+  echo [OSHIBKA] npm install ne udalsya.
+  echo Prover internet i poprobuy eshche raz.
+  echo.
+  pause
+  exit /b 1
+)
+
+echo.
+echo [2/2] Zapusk servera...
+echo.
+echo Otkroy v brauzere: http://127.0.0.1:4721/
+echo Kompas:           http://127.0.0.1:4721/compass
+echo.
+echo Ne zakryvay eto okno, poka igraesh.
+echo Ostanovka: Ctrl+C
+echo.
+
+timeout /t 2 /nobreak >nul
+start "" "http://127.0.0.1:4721/"
+
+call npm run dev
+echo.
+echo Server ostanovlen.
+pause
+endlocal
