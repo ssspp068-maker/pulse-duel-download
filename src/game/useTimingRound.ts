@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { playHitSound } from './sounds'
 import type { HitQuality, RoundStats } from './types'
 
 const TWO_PI = Math.PI * 2
@@ -14,14 +15,16 @@ function angleDistance(a: number, b: number): number {
 }
 
 export interface TimingState {
-  phase: 'idle' | 'running' | 'ended'
+  phase: 'idle' | 'countdown' | 'running' | 'ended'
   angle: number
   zoneCenter: number
   zoneWidth: number
   speed: number
   stats: RoundStats
   lastHit: HitQuality | null
+  lastGain: number
   flash: number
+  shake: number
 }
 
 const INITIAL_STATS: RoundStats = {
@@ -41,7 +44,9 @@ function createIdleState(): TimingState {
     speed: 2.2,
     stats: { ...INITIAL_STATS },
     lastHit: null,
+    lastGain: 0,
     flash: 0,
+    shake: 0,
   }
 }
 
@@ -80,17 +85,19 @@ export function useTimingRound() {
         ...prev,
         angle: normalizeAngle(prev.angle + prev.speed * dt),
         flash: Math.max(0, prev.flash - dt * 3),
+        shake: Math.max(0, prev.shake - dt * 2.5),
       }
     })
 
     rafRef.current = requestAnimationFrame(tick)
   }, [stopLoop])
 
-  const start = useCallback(() => {
+  const beginRunning = useCallback(() => {
     stopLoop()
     const next: TimingState = {
       ...createIdleState(),
       phase: 'running',
+      zoneWidth: 0.82,
       zoneCenter: Math.random() * TWO_PI,
     }
     stateRef.current = next
@@ -98,9 +105,18 @@ export function useTimingRound() {
     rafRef.current = requestAnimationFrame(tick)
   }, [stopLoop, tick])
 
+  const start = useCallback(() => {
+    stopLoop()
+    setState({
+      ...createIdleState(),
+      phase: 'countdown',
+    })
+  }, [stopLoop])
+
   const hit = useCallback(() => {
     const current = stateRef.current
     if (current.phase !== 'running') return
+    // ignore taps during countdown / idle ended handled by UI
 
     const dist = angleDistance(current.angle, current.zoneCenter)
     const half = current.zoneWidth / 2
@@ -111,13 +127,17 @@ export function useTimingRound() {
     else if (dist <= half) quality = 'good'
     else quality = 'miss'
 
+    playHitSound(quality)
+
     if (quality === 'miss') {
       stopLoop()
       setState((prev) => ({
         ...prev,
         phase: 'ended',
         lastHit: 'miss',
+        lastGain: 0,
         flash: 1,
+        shake: 1,
         stats: {
           ...prev.stats,
           streak: 0,
@@ -127,8 +147,9 @@ export function useTimingRound() {
     }
 
     const streak = current.stats.streak + 1
-    const base = quality === 'perfect' ? 120 : 70
-    const gained = Math.round(base * (1 + streak * 0.12))
+    const base = quality === 'perfect' ? 140 : 75
+    const warmup = current.stats.hits < 3 ? 1.15 : 1
+    const gained = Math.round(base * warmup * (1 + streak * 0.14))
     const nextWidth = Math.max(0.28, current.zoneWidth - (quality === 'perfect' ? 0.035 : 0.02))
     const nextSpeed = Math.min(5.4, current.speed + (quality === 'perfect' ? 0.14 : 0.09))
 
@@ -142,7 +163,9 @@ export function useTimingRound() {
       zoneWidth: nextWidth,
       speed: nextSpeed,
       lastHit: quality,
+      lastGain: gained,
       flash: 1,
+      shake: 0,
       stats: {
         score: prev.stats.score + gained,
         streak,
@@ -155,8 +178,14 @@ export function useTimingRound() {
 
   useEffect(() => () => stopLoop(), [stopLoop])
 
-  return { state, start, hit, reset: () => {
-    stopLoop()
-    setState(createIdleState())
-  } }
+  return {
+    state,
+    start,
+    beginRunning,
+    hit,
+    reset: () => {
+      stopLoop()
+      setState(createIdleState())
+    },
+  }
 }
